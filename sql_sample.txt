@@ -1,0 +1,226 @@
+-- My answers to questions from an SQL assessment using the well-known Sakila dataset
+
+
+-- 1. List all movies that are either PG OR PG-13 using IN operator
+
+SELECT title
+FROM film
+WHERE rating IN ('PG', 'PG-13');
+
+
+
+-- 2. List all staff members (first name, last name, email) with missing passwords
+
+SELECT first_name, last_name, email
+FROM staff
+WHERE password IS NULL;
+
+
+
+-- 3. Select all films that have title names that contain the word ZOO and rental duration greater than or equal to 4
+
+This query returns rows where 'ZOO' is a separate word:
+
+SELECT *
+FROM film
+WHERE title LIKE 'ZOO'
+AND rental_duration >= 4;
+
+And this query returns rows where 'ZOO' is part of a longer string, in this case the movies with 'ZOOLANDER' in the title:
+
+SELECT *
+FROM film
+WHERE title LIKE '%ZOO%'
+AND rental_duration >= 4;
+
+
+
+-- 4. List customers and payment amounts, with payments greater than the total (global) average payment amount
+
+SELECT p.customer_id, c.first_name, c.last_name, ROUND(p.amount, 2)
+FROM customer AS c
+INNER JOIN payment AS p
+ON c.customer_id = p.customer_id
+WHERE p.amount > (SELECT AVG(amount) FROM payment);
+
+
+
+-- 5. List customers who have rented movies at least once using the IN operator
+
+SELECT r.rental_id, c.customer_id, c.first_name, c.last_name
+FROM customer AS c
+INNER JOIN rental AS r
+ON r.customer_id = c.customer_id
+WHERE c.customer_id IN
+(SELECT customer_id
+FROM rental
+GROUP BY customer_id
+HAVING COUNT(customer_id) > 1);
+
+
+
+-- 6. List the top 10 newest customers across all stores
+
+SELECT *
+FROM customer
+WHERE (SELECT MAX(create_date))
+LIMIT 10;
+
+
+
+-- 7. Find the top 2 movies with movie length strictly greater than (>) 50mins,
+-- which has commentaries as a special features, and with the highest replacement cost
+
+SELECT *
+FROM film
+WHERE length > 50
+AND special_features LIKE ('%Commentaries%')
+ORDER BY replacement_cost DESC
+LIMIT 2;
+
+
+
+-- 8. What are the minimum amount, maximum amount, and average payment received across all transactions?
+
+SELECT MIN(amount), MAX(amount), AVG(amount)
+FROM payment;
+
+
+
+-- 9. What is the total amount spent by customers for movies in the year 2005 ?
+
+SELECT SUM(amount) AS total_amount_spent
+FROM payment
+WHERE YEAR(payment_date) = '2005';
+
+
+
+-- 10. Extract the street number ( characters 1 through 4 ) from customer addressLine1
+
+SELECT REGEXP_SUBSTR(a.address, "[0-9]+")
+FROM customer AS C
+INNER JOIN address AS a
+ON c.address_id = a.address_id
+LIMIT 1;
+
+
+
+-- 11. Find out actors whose last name starts with character A, B or C.
+
+SELECT *
+FROM actor
+WHERE last_name LIKE 'A%'
+OR last_name LIKE 'B%'
+OR last_name LIKE 'C%';
+
+
+
+-- 12. Format a payment_date using the following format e.g "22/1/2016"
+
+note: this returns the reformatted date as well as the time for all rows in the payment table
+
+SELECT date_format(payment_date, '%d/%m/%Y %H:%i:%s')
+FROM payment;
+
+
+
+-- 13. Find the number of days between two date values rental_date & return_date
+
+SELECT rental_date, return_date, DATEDIFF(return_date, rental_date)
+AS number_of_days
+FROM rental;
+
+
+
+-- 14. Count of movies that are either G/NC-17/PG-13/PG/R grouped by rating.
+
+SELECT rating, COUNT(*) AS count
+FROM film
+GROUP BY rating;
+
+
+
+-- 15. How many films involve a “Crocodile” and a “Shark” based on film description?
+-- NOTE: Use a CASE WHEN statement to set up two new fields and count them.
+
+SELECT SUM(CASE
+WHEN description LIKE '%Crocodile%' THEN 1
+ELSE 0
+END) AS Crocodile,
+SUM(CASE
+WHEN description LIKE '%SHARK%' THEN 1
+ELSE 0
+END) AS Shark
+FROM film_text;
+
+
+
+-- 16. List the actors (firstName, lastName) who acted in strictly more than (>) 25 movies.
+-- NOTE: Also show the count of movies against each actor
+
+SELECT a.first_name, a.last_name, COUNT(*) AS count
+FROM actor AS a
+JOIN film_actor AS f
+ON a.actor_id = f.actor_id
+GROUP BY f.actor_id
+HAVING count > 25;
+
+
+
+-- 17.a. Merge together the customer table and the address table, including any other supplementary lookup tables.
+-- 		 Then recast all fields with dates as DateTime
+
+SELECT *, CAST(c.last_update AS DATETIME), CAST(a.last_update AS DATETIME),
+CAST(city.last_update AS DATETIME), CAST(country.last_update AS DATETIME)
+FROM customer AS c
+JOIN address AS a
+ON c.address_id = a.address_id
+JOIN city as city
+ON a.city_id = city.city_id
+JOIN country AS country
+ON city.country_id = country.country_id;
+
+
+
+-- 17.b. Are there any customers whose last_update field differs from the address last_update?
+
+SELECT *, CAST(c.last_update AS DATETIME), CAST(a.last_update AS DATETIME),
+CAST(city.last_update AS DATETIME), CAST(country.last_update AS DATETIME)
+FROM customer AS c
+JOIN address AS a
+ON c.address_id = a.address_id
+JOIN city as city
+ON a.city_id = city.city_id
+JOIN country AS country
+ON city.country_id = country.country_id
+WHERE c.last_update <> a.last_update;
+
+
+
+-- 18.a. What was the percentage increase or decrease in the number of rentals from May 2005 to June 2006?
+
+SELECT (
+SELECT COUNT(*)
+FROM rental
+WHERE MONTH(rental_date) = '05' AND YEAR(rental_date) = '2005') AS May,
+(
+SELECT COUNT(*)
+FROM rental
+WHERE MONTH(rental_date) = '06' AND YEAR(rental_date) = '2005') AS June,
+(
+SELECT (June - May) / May * 100) AS percentage_change;
+
+
+
+-- 18.b. From Q3 to Q4?
+
+SELECT (
+SELECT COUNT(*)
+FROM rental
+WHERE DATE(rental_date) > '2005-07-01' AND DATE(rental_date) < '2005-09-30') AS q3,
+(
+SELECT COUNT(*)
+FROM rental
+WHERE DATE(rental_date) > '2005-10-01' AND DATE(rental_date) < '2005-12-31') AS q4,
+(
+SELECT (q4 - q3) / q3 * 100) AS percentage_change;
